@@ -73,9 +73,9 @@ main :: () {
     fullscreen := true;
     Simp.set_render_target(window);
 
-    image_test: Simp.Texture;
+    stickman: Simp.Texture;
     {
-        success := Simp.texture_load_from_file(*image_test, "image_test.png");
+        success := Simp.texture_load_from_file(*stickman, "stickman.png");
         assert(success);
     }
     cursor: Simp.Texture;
@@ -83,9 +83,16 @@ main :: () {
         success := Simp.texture_load_from_file(*cursor, "cursor.png");
         assert(success);
     }
+    sword: Simp.Texture;
+    {
+        success := Simp.texture_load_from_file(*sword, "sword.png");
+        assert(success);
+    }
 
     guypos := v2(0, 0);
     guyvel := v2(0, 0);
+
+    sword_vector := v2(0, 0);
 
     prev := get_time();
 
@@ -118,6 +125,13 @@ main :: () {
             }
         }
         if quit break;
+
+        mouse_pos := v2(0, 0);
+        {
+            mouse_x, mouse_y, succ := get_mouse_pointer_position(window, false);
+            assert(succ);
+            mouse_pos = v2(cast(float) (mouse_x - window_width / 2) / window_width, cast(float) (window_height / 2 - mouse_y) / window_width) * CAMERA_SCALE;
+        }
 
         GUY_SPEED :: 4.0;
         GUY_ACCEL :: 69.0;
@@ -159,51 +173,28 @@ main :: () {
                 guyvel *= max_speed;
             }
             guypos += guyvel * dt;
-        }
 
-        mouse_pos := v2(0, 0);
-        {
-            mouse_x, mouse_y, succ := get_mouse_pointer_position(window, false);
-            assert(succ);
-            mouse_pos = v2(cast(float) (mouse_x - window_width / 2) / window_width, cast(float) (window_height / 2 - mouse_y) / window_width) * CAMERA_SCALE;
+            sword_vector = normalize(mouse_pos - guypos);
         }
 
         // debug_break();
         Simp.clear_render_target(0, 0, 0, 1);
         Simp.set_shader_for_color();
-        Simp.set_shader_for_images(*image_test);
-        {
-            p := guypos / CAMERA_SCALE;
-            w := v2(1.0 / CAMERA_SCALE / 2, 0.0);
-            h := v2(0.0, 1.0 / CAMERA_SCALE / 2);
-            p0 := (p - w - h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
-            p1 := (p + w - h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
-            p2 := (p + w + h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
-            p3 := (p - w + h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
-            c0 := Vector4.{1, 1, 1, 1};
-            c1 := Vector4.{1, 1, 1, 1};
-            c2 := Vector4.{1, 1, 1, 1};
-            c3 := Vector4.{1, 1, 1, 1};
-            Simp.immediate_quad(p0, p1, p2, p3, c0, c1, c2, c3);
+        draw_rect :: (image: * Simp.Texture, pos: Vector2, CAMERA_SCALE: float, theta: float, w: float, h: float) {
+            Simp.set_shader_for_images(image);
+            p := pos / CAMERA_SCALE;
+            rw := v2(xx cos(theta) * w / CAMERA_SCALE / 2, xx sin(theta) * w / CAMERA_SCALE / 2);
+            rh := v2(xx -sin(theta) * h / CAMERA_SCALE / 2, xx cos(theta) * h / CAMERA_SCALE / 2);
+            p0 := (p - rw - rh) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p1 := (p + rw - rh) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p2 := (p + rw + rh) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p3 := (p - rw + rh) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            Simp.immediate_quad(p0, p1, p2, p3);
             Simp.immediate_flush();
         }
-
-        Simp.set_shader_for_images(*cursor);
-        {
-            p := mouse_pos / CAMERA_SCALE;
-            w := v2(1.0 / CAMERA_SCALE / 2, 0.0);
-            h := v2(0.0, 1.0 / CAMERA_SCALE / 2);
-            p0 := (p - w - h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
-            p1 := (p + w - h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
-            p2 := (p + w + h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
-            p3 := (p - w + h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
-            c0 := Vector4.{1, 1, 1, 1};
-            c1 := Vector4.{1, 1, 1, 1};
-            c2 := Vector4.{1, 1, 1, 1};
-            c3 := Vector4.{1, 1, 1, 1};
-            Simp.immediate_quad(p0, p1, p2, p3, c0, c1, c2, c3);
-            Simp.immediate_flush();
-        }
+        draw_rect(*stickman, guypos, CAMERA_SCALE, 0, 1, 1);
+        draw_rect(*cursor, mouse_pos, CAMERA_SCALE, xx fmod(get_time(), 1) * TAU, 1, 1);
+        draw_rect(*sword, guypos + sword_vector, CAMERA_SCALE, atan2(sword_vector.y, sword_vector.x), 2, 1);
 
         Simp.swap_buffers(window);
     }
