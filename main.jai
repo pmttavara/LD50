@@ -21,6 +21,18 @@ Input :: #import "Input";
 //     return li.QuadPart * invfreq;
 // }
 
+
+normalize :: (v : Vector2) -> Vector2 {
+    m := v.x * v.x + v.y * v.y;
+    if (m) {
+        m = 1.0 / sqrt(m);
+    }
+    result := v;
+    result.x *= m;
+    result.y *= m;
+    return result;
+}
+
 main :: () {
     Windows.timeBeginPeriod(1);
     defer {
@@ -104,6 +116,7 @@ main :: () {
 
     Entity :: struct {
         using pos: Vector2;
+        scheduled_for_deletion := false;
     }
 
     Guy :: struct {
@@ -134,32 +147,42 @@ main :: () {
     }
 
     rocks: [..] Rock;
-    array_add(*rocks, Rock.{ x = 2, y = 2 });
-    array_add(*rocks, Rock.{ x = 3, y = 4 });
-    array_add(*rocks, Rock.{ x = 4, y = 5 });
-    array_add(*rocks, Rock.{ x = 5, y = 1 });
-    array_add(*rocks, Rock.{ x = 9, y = 0 });
-    array_add(*rocks, Rock.{ x = 7, y = 2 });
-    array_add(*rocks, Rock.{ x = 1, y = 3 });
-    array_add(*rocks, Rock.{ x = 8, y = 3 });
-    array_add(*rocks, Rock.{ x = 1, y = 4 });
-    array_add(*rocks, Rock.{ x = 8, y = 5 });
-    array_add(*rocks, Rock.{ x = 8, y = 6 });
-    array_add(*rocks, Rock.{ x = 9, y = 7 });
 
     trees: [..] Tree;
-    array_add(*trees, Tree.{ x = 12, y = 2 });
-    array_add(*trees, Tree.{ x = 13, y = 2 });
-    array_add(*trees, Tree.{ x = 14, y = 2 });
-    array_add(*trees, Tree.{ x = 15, y = 2 });
-    array_add(*trees, Tree.{ x = 16, y = 2 });
-    array_add(*trees, Tree.{ x = 17, y = 2 });
-    array_add(*trees, Tree.{ x = 18, y = 2 });
-    array_add(*trees, Tree.{ x = 18, y = 3 });
-    array_add(*trees, Tree.{ x = 18, y = 4 });
-    array_add(*trees, Tree.{ x = 18, y = 5 });
-    array_add(*trees, Tree.{ x = 18, y = 6 });
-    array_add(*trees, Tree.{ x = 19, y = 7 });
+
+    reset_game :: () #expand {
+        guy = .{};
+        sword_vector = .{};
+        swing_timer = 0;
+        camera = .{};
+        rocks.count = 0;
+        trees.count = 0;
+        array_add(*rocks, Rock.{ x = 2, y = 2 });
+        array_add(*rocks, Rock.{ x = 3, y = 4 });
+        array_add(*rocks, Rock.{ x = 4, y = 5 });
+        array_add(*rocks, Rock.{ x = 5, y = 1 });
+        array_add(*rocks, Rock.{ x = 9, y = 0 });
+        array_add(*rocks, Rock.{ x = 7, y = 2 });
+        array_add(*rocks, Rock.{ x = 1, y = 3 });
+        array_add(*rocks, Rock.{ x = 8, y = 3 });
+        array_add(*rocks, Rock.{ x = 1, y = 4 });
+        array_add(*rocks, Rock.{ x = 8, y = 5 });
+        array_add(*rocks, Rock.{ x = 8, y = 6 });
+        array_add(*rocks, Rock.{ x = 9, y = 7 });
+        array_add(*trees, Tree.{ x = 12, y = 2 });
+        array_add(*trees, Tree.{ x = 13, y = 2 });
+        array_add(*trees, Tree.{ x = 14, y = 2 });
+        array_add(*trees, Tree.{ x = 15, y = 2 });
+        array_add(*trees, Tree.{ x = 16, y = 2 });
+        array_add(*trees, Tree.{ x = 17, y = 2 });
+        array_add(*trees, Tree.{ x = 18, y = 2 });
+        array_add(*trees, Tree.{ x = 18, y = 3 });
+        array_add(*trees, Tree.{ x = 18, y = 4 });
+        array_add(*trees, Tree.{ x = 18, y = 5 });
+        array_add(*trees, Tree.{ x = 18, y = 6 });
+        array_add(*trees, Tree.{ x = 19, y = 7 });
+    }
+    reset_game();
 
     accumulator := 0.0;
 
@@ -198,15 +221,20 @@ main :: () {
             if it.type == .QUIT quit = true;
 
             if it.type == .KEYBOARD {
-                if it.key_pressed && (it.key_code == .F11 || (it.key_code == .ENTER && it.alt_pressed)) {
-                    fullscreen = !fullscreen;
-                    toggle_fullscreen(window, fullscreen, *saved_window_info);
-                }
-                if it.key_pressed && (it.key_code == .F4 && it.alt_pressed) {
-                    quit = true;
-                }
-                if it.key_pressed && (it.key_code == #char " " || it.key_code == .MOUSE_BUTTON_LEFT) {
-                    spacebar_pressed = true;
+                if it.key_pressed && !it.repeat {
+                    if it.key_code == .F11 || (it.key_code == .ENTER && it.alt_pressed) {
+                        fullscreen = !fullscreen;
+                        toggle_fullscreen(window, fullscreen, *saved_window_info);
+                    }
+                    if it.key_code == .F4 && it.alt_pressed {
+                        quit = true;
+                    }
+                    if it.key_code == #char " " || it.key_code == .MOUSE_BUTTON_LEFT {
+                        spacebar_pressed = true;
+                    }
+                    if it.key_code == #char "T" {
+                        reset_game();
+                    }
                 }
             }
         }
@@ -240,16 +268,6 @@ main :: () {
                                             - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "F") >= 0x8000)));
                 
                 input := v2(x, y);
-                normalize :: (v : Vector2) -> Vector2 {
-                    m := v.x * v.x + v.y * v.y;
-                    if (m) {
-                        m = 1.0 / sqrt(m);
-                    }
-                    result := v;
-                    result.x *= m;
-                    result.y *= m;
-                    return result;
-                }
                 input = normalize(input);
 
                 swing_timer -= dt;
@@ -339,6 +357,20 @@ main :: () {
                 }
             }
             for * trees {
+                v := get_sword_vector(sword_vector, swing_timer, SWING_TIME);
+
+                disp := it.pos - guy.pos;
+                dist := length(disp);
+                dir := normalize(disp);
+                theta :: TAU / 64;
+                if dist < 3 && dot(dir, v) >= cos(theta) {
+                    if swing_timer >= SWING_TIME * 0.75 {
+                        it.scheduled_for_deletion = true;
+                    }
+                }
+                
+            }
+            for * trees {
                 disp := it.pos - guy.pos;
                 dist := length(disp);
                 dir := disp / dist;
@@ -354,6 +386,17 @@ main :: () {
                         guy.vel -= projection_onto_dir;
                     }
                     // guy.vel = .{};
+                }
+            }
+
+            {
+                i := 0;
+                while i < trees.count {
+                    if trees[i].scheduled_for_deletion {
+                        array_ordered_remove_by_index(*trees, i);
+                    } else {
+                        i += 1;
+                    }
                 }
             }
         }
@@ -395,9 +438,21 @@ main :: () {
 
         draw_rect(*stickman, guy.pos, *camera, 0, 1, 1);
         draw_rect(*cursor, mouse_pos, *camera, xx fmod(get_time() / 8, 1) * TAU, 1, 1);
+        get_sword_vector :: (base_sword_vector: Vector2, swing_timer: float, $SWING_TIME: float) -> Vector2 {
+            x := swing_timer / SWING_TIME;
+            K := 0.75;
+            if x < K {
+                x /= K;
+            } else {
+                x = 1 - (x - K) / (1 - K);
+            }
+            x = clamp(x, 0, 1);
+            theta := x * TAU / 4 - TAU / 8;
+            v := rotate(base_sword_vector, theta);
+            return v;
+        }
         {
-            theta := clamp((swing_timer - SWING_TIME * 0) / (SWING_TIME * 1), 0, 1) * TAU / 4 - TAU / 8;
-            v := rotate(sword_vector, theta);
+            v := get_sword_vector(sword_vector, swing_timer, SWING_TIME);
             draw_rect(*sword, guy.pos + v * 1.5, *camera, atan2(v.y, v.x), 2, 1);
         }
         Simp.immediate_flush();
