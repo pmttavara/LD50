@@ -67,19 +67,29 @@ main :: () {
         Windows.FreeLibrary(user32_dll);
     }
     window := create_window(window_width, window_height, "Hello");
+    Windows.MoveWindow(window, -1900, 100, window_width, window_height, 0); // @Temporary @Remove
     saved_window_info : Saved_Window_Info;
     toggle_fullscreen(window, true, *saved_window_info);
+    fullscreen := true;
     Simp.set_render_target(window);
 
     image_test: Simp.Texture;
-    success := Simp.texture_load_from_file(*image_test, "image_test.png");
-    assert(success);
+    {
+        success := Simp.texture_load_from_file(*image_test, "image_test.png");
+        assert(success);
+    }
+    cursor: Simp.Texture;
+    {
+        success := Simp.texture_load_from_file(*cursor, "cursor.png");
+        assert(success);
+    }
 
     guypos := v2(0, 0);
 
     prev := get_time();
-        
-    fullscreen := true;
+
+    CAMERA_SCALE := 35.0;
+
     quit := false;
     while !quit {
         next := get_time();
@@ -106,14 +116,18 @@ main :: () {
                 }
             }
         }
+        if quit break;
 
-        GUY_SPEED :: 2.0;
+        GUY_SPEED :: 4.0;
         {
             x := cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "D") >= 0x8000)
                - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "A") >= 0x8000);
 
             y := cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "W") >= 0x8000)
                - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "S") >= 0x8000);
+
+            // CAMERA_SCALE *= pow(2.0, dt * (cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "R") >= 0x8000)
+            //                              - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "F") >= 0x8000)));
             
             input := v2(x, y);
             normalize :: (v : Vector2) -> Vector2 {
@@ -132,18 +146,42 @@ main :: () {
             guypos.y += dt * GUY_SPEED * input.y;
         }
 
+        mouse_pos := v2(0, 0);
+        {
+            mouse_x, mouse_y, succ := get_mouse_pointer_position(window, false);
+            assert(succ);
+            mouse_pos = v2(cast(float) (mouse_x - window_width / 2) / window_width, cast(float) (window_height / 2 - mouse_y) / window_width) * CAMERA_SCALE;
+        }
+
         // debug_break();
         Simp.clear_render_target(0, 0, 0, 1);
         Simp.set_shader_for_color();
         Simp.set_shader_for_images(*image_test);
         {
-            p := v2(0.5, 0.5) + guypos * 0.1;
-            w := v2(0.05, 0.0);
-            h := v2(0.0, 0.05);
-            p0 := (p - w - h) * v2(xx window_width, xx window_height);
-            p1 := (p + w - h) * v2(xx window_width, xx window_height);
-            p2 := (p + w + h) * v2(xx window_width, xx window_height);
-            p3 := (p - w + h) * v2(xx window_width, xx window_height);
+            p := guypos / CAMERA_SCALE;
+            w := v2(1.0 / CAMERA_SCALE / 2, 0.0);
+            h := v2(0.0, 1.0 / CAMERA_SCALE / 2);
+            p0 := (p - w - h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p1 := (p + w - h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p2 := (p + w + h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p3 := (p - w + h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            c0 := Vector4.{1, 1, 1, 1};
+            c1 := Vector4.{1, 1, 1, 1};
+            c2 := Vector4.{1, 1, 1, 1};
+            c3 := Vector4.{1, 1, 1, 1};
+            Simp.immediate_quad(p0, p1, p2, p3, c0, c1, c2, c3);
+            Simp.immediate_flush();
+        }
+
+        Simp.set_shader_for_images(*cursor);
+        {
+            p := mouse_pos / CAMERA_SCALE;
+            w := v2(1.0 / CAMERA_SCALE / 2, 0.0);
+            h := v2(0.0, 1.0 / CAMERA_SCALE / 2);
+            p0 := (p - w - h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p1 := (p + w - h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p2 := (p + w + h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
+            p3 := (p - w + h) * v2(xx window_width, xx window_width) + v2(xx(window_width / 2), xx(window_height / 2));
             c0 := Vector4.{1, 1, 1, 1};
             c1 := Vector4.{1, 1, 1, 1};
             c2 := Vector4.{1, 1, 1, 1};
