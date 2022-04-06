@@ -74,7 +74,7 @@ main :: () {
     Simp.set_render_target(window);
 
     GL :: #import "GL";
-    GL.wglSwapIntervalEXT(-1);
+    GL.wglSwapIntervalEXT(0);
     
     stickman: Simp.Texture;
     {
@@ -135,14 +135,14 @@ main :: () {
 
     rocks: [..] Rock;
     array_add(*rocks, Rock.{ x = 2, y = 2 });
-    array_add(*rocks, Rock.{ x = 3, y = 2 });
-    array_add(*rocks, Rock.{ x = 4, y = 2 });
-    array_add(*rocks, Rock.{ x = 5, y = 2 });
-    array_add(*rocks, Rock.{ x = 6, y = 2 });
+    array_add(*rocks, Rock.{ x = 3, y = 4 });
+    array_add(*rocks, Rock.{ x = 4, y = 5 });
+    array_add(*rocks, Rock.{ x = 5, y = 1 });
+    array_add(*rocks, Rock.{ x = 9, y = 0 });
     array_add(*rocks, Rock.{ x = 7, y = 2 });
-    array_add(*rocks, Rock.{ x = 8, y = 2 });
+    array_add(*rocks, Rock.{ x = 1, y = 3 });
     array_add(*rocks, Rock.{ x = 8, y = 3 });
-    array_add(*rocks, Rock.{ x = 8, y = 4 });
+    array_add(*rocks, Rock.{ x = 1, y = 4 });
     array_add(*rocks, Rock.{ x = 8, y = 5 });
     array_add(*rocks, Rock.{ x = 8, y = 6 });
     array_add(*rocks, Rock.{ x = 9, y = 7 });
@@ -161,11 +161,29 @@ main :: () {
     array_add(*trees, Tree.{ x = 18, y = 6 });
     array_add(*trees, Tree.{ x = 19, y = 7 });
 
+    accumulator := 0.0;
+
+    mouse_pos := v2(0, 0);
+
     quit := false;
     while !quit {
+        {
+            speculative_dt := get_time() - prev;
+            target_time := cast(float64) 1.0 / 240;
+            time_to_sleep := target_time - (accumulator + speculative_dt);
+            if time_to_sleep > 0 {
+                start := get_time();
+                while get_time() - start < time_to_sleep {}
+            }
+        }
         next := get_time();
         dt := cast(float) (next - prev);
         prev = next;
+        accumulator += dt;
+        if accumulator > 0.5 {
+            accumulator = 0.5;
+        }
+        
         Input.update_window_events();
         for Input.get_window_resizes() {
             Simp.update_window(it.window);
@@ -174,6 +192,7 @@ main :: () {
                 window_height = it.height;
             }
         }
+
         spacebar_pressed := false;
         for Input.events_this_frame {
             if it.type == .QUIT quit = true;
@@ -192,128 +211,149 @@ main :: () {
             }
         }
         if quit break;
-
-        camera.pos -= guy.pos;
-        camera.pos *= pow(0.01, dt);
-        camera.pos += guy.pos;
-
-        mouse_pos := v2(0, 0);
         {
             mouse_x, mouse_y, succ := get_mouse_pointer_position(window, false);
-            assert(succ);
-            mouse_pos = v2(cast(float) (mouse_x - window_width / 2) / window_width, cast(float) (window_height / 2 - mouse_y) / window_width) * camera.scale + camera.pos;
+            if succ {
+                mouse_pos = v2(cast(float) (mouse_x - window_width / 2) / window_width, cast(float) (window_height / 2 - mouse_y) / window_width) * camera.scale + camera.pos;
+            }
         }
 
-        GUY_SPEED :: 4.0;
-        GUY_ACCEL :: GUY_SPEED * 8;
-        GUY_TURN_ACCEL :: GUY_ACCEL * 8;
-        {
-            x := cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "D") >= 0x8000)
-               - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "A") >= 0x8000);
+        while accumulator > 1.0 / 240 {
+            accumulator -= 1.0 / 240;
 
-            y := cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "W") >= 0x8000)
-               - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "S") >= 0x8000);
+            dt := 1.0 / 240;
+            camera.pos -= guy.pos;
+            camera.pos *= pow(0.01, dt);
+            camera.pos += guy.pos;
 
-            camera.scale *= pow(2.0, dt * (cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "R") >= 0x8000)
-                                         - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "F") >= 0x8000)));
-            
-            input := v2(x, y);
-            normalize :: (v : Vector2) -> Vector2 {
-                m := v.x * v.x + v.y * v.y;
-                if (m) {
-                    m = 1.0 / sqrt(m);
-                }
-                result := v;
-                result.x *= m;
-                result.y *= m;
-                return result;
-            }
-            input = normalize(input);
-
-            swing_timer -= dt;
-            if spacebar_pressed {
-                if swing_timer < 0 {
-                    swing_timer = SWING_TIME;
-
-                    // if dot(guy.vel, sword_vector) < GUY_SPEED * 0.25 {
-                    //     guy.vel += sword_vector * 10;
-                    // } else {
-                    //     guy.vel += sword_vector * 1;
-                    // }
-                    impulse := 10.0;
-                    delta_this_frame := clamp(GUY_SPEED * 2 - dot(guy.vel, sword_vector), 0, impulse);
-                    guy.vel += sword_vector * delta_this_frame;
-                }
-            }
-
-            accel := GUY_ACCEL;
+            GUY_SPEED :: 4.0;
+            GUY_ACCEL :: GUY_SPEED * 8;
+            GUY_TURN_ACCEL :: GUY_ACCEL * 8;
             {
-                if length(guy.vel) > GUY_SPEED / 8 && length(input) > 0 && dot(normalize(guy.vel), normalize(input)) <= cos(TAU / 16) + 0.01 {
-                    accel = GUY_TURN_ACCEL;
-                    // print("GUY_TURN_ACCEL!!!!!!!\n");
-                }
-                delta_total := accel * dt;
-                delta_this_frame := clamp(GUY_SPEED - dot(guy.vel, input), 0, delta_total);
-                accel = delta_this_frame / dt;
-            }
+                x := cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "D") >= 0x8000)
+                - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "A") >= 0x8000);
+
+                y := cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "W") >= 0x8000)
+                - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "S") >= 0x8000);
+
+                camera.scale *= pow(2.0, dt * (cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "R") >= 0x8000)
+                                            - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "F") >= 0x8000)));
                 
-            guy.vel += dt * accel * input;
+                input := v2(x, y);
+                normalize :: (v : Vector2) -> Vector2 {
+                    m := v.x * v.x + v.y * v.y;
+                    if (m) {
+                        m = 1.0 / sqrt(m);
+                    }
+                    result := v;
+                    result.x *= m;
+                    result.y *= m;
+                    return result;
+                }
+                input = normalize(input);
 
-            // print("% %% of max speed\n", length(guy.vel) / GUY_SPEED * 100);
-            
-            if length(input) <= 0.01 {
-                guy.vel *= pow(0.0000001, dt);
-            } else {
-                input_perp := v2(input.y, -input.x);
-                orthogonal_vel := input_perp * (dot(guy.vel, input_perp) / dot(input_perp, input_perp));
-                guy.vel -= orthogonal_vel;
-                orthogonal_vel *= pow(0.0000001, dt);
-                guy.vel += orthogonal_vel;
+                swing_timer -= dt;
+                if spacebar_pressed {
+                    if swing_timer < 0 {
+                        swing_timer = SWING_TIME;
 
-                // speed := max(GUY_SPEED * 0, length(guy.vel));
-                // friction_amt := speed * 4 * dt;
-                // scale := clamp(speed - friction_amt, 0, speed) / speed;
-                // guy.vel *= scale;
-            }
-            guy.pos += guy.vel * dt;
+                        // if dot(guy.vel, sword_vector) < GUY_SPEED * 0.25 {
+                        //     guy.vel += sword_vector * 10;
+                        // } else {
+                        //     guy.vel += sword_vector * 1;
+                        // }
+                        impulse := 10.0;
+                        delta_this_frame := clamp(GUY_SPEED * 2 - dot(guy.vel, sword_vector), 0, impulse);
+                        guy.vel += sword_vector * delta_this_frame;
+                    }
+                }
 
-            // if swing_timer < 0
-            {
-                sword_vector = normalize(mouse_pos - guy.pos);
-            }
-        }
+                accel := GUY_ACCEL;
+                {
+                    if length(guy.vel) > GUY_SPEED / 8 && length(input) > 0 && dot(normalize(guy.vel), normalize(input)) <= cos(TAU / 16) + 0.01 {
+                        accel = GUY_TURN_ACCEL;
+                        // print("GUY_TURN_ACCEL!!!!!!!\n");
+                    }
+                    delta_total := accel * dt;
+                    delta_this_frame := clamp(GUY_SPEED - dot(guy.vel, input), 0, delta_total);
+                    accel = delta_this_frame / dt;
+                }
+                    
+                guy.vel += dt * accel * input;
 
-        for * rocks {
-            disp := it.pos - guy.pos;
-            dist := length(disp);
-            dir := disp / dist;
-            if dist == 0 {
-                dir = .{1, 0};
-            }
-            if dist < 1 {
-                overlap := 1 - dist;
-                // it.pos += dir * overlap / 2;
-                guy.pos -= dir * overlap;
-                projection_onto_dir := dot(guy.vel, dir) * dir;
-                if dot(guy.vel, dir) >= 0 {
-                    guy.vel -= projection_onto_dir;
+                // print("% %% of max speed\n", length(guy.vel) / GUY_SPEED * 100);
+                
+                if length(input) <= 0.01 {
+                    guy.vel *= pow(0.0000001, dt);
+                } else {
+                    input_perp := v2(input.y, -input.x);
+                    orthogonal_vel := input_perp * (dot(guy.vel, input_perp) / dot(input_perp, input_perp));
+                    guy.vel -= orthogonal_vel;
+                    orthogonal_vel *= pow(0.0000001, dt);
+                    guy.vel += orthogonal_vel;
+
+                    // speed := max(GUY_SPEED * 0, length(guy.vel));
+                    // friction_amt := speed * 4 * dt;
+                    // scale := clamp(speed - friction_amt, 0, speed) / speed;
+                    // guy.vel *= scale;
+                }
+                guy.pos += guy.vel * dt;
+
+                // if swing_timer < 0
+                {
+                    sword_vector = normalize(mouse_pos - guy.pos);
                 }
             }
-        }
-        for * trees {
-            disp := it.pos - guy.pos;
-            dist := length(disp);
-            dir := disp / dist;
-            if dist == 0 {
-                dir = .{1, 0};
+
+            for * rocks {
+                disp := it.pos - guy.pos;
+                dist := length(disp);
+                dir := disp / dist;
+                if dist == 0 {
+                    dir = .{1, 0};
+                }
+                if dist < 1 {
+                    overlap := 1 - dist;
+                    it.pos += dir * overlap / 2;
+                    guy.pos -= dir * overlap / 2;
+                    projection_onto_dir := dot(guy.vel, dir) * dir;
+                    if dot(guy.vel, dir) >= 0 {
+                        // guy.vel -= projection_onto_dir;
+                    }
+                    // guy.vel = .{};
+                }
             }
-            if dist < 0.5 {
-                overlap := 0.5 - dist;
-                // it.pos += dir * overlap / 2;
-                guy.pos -= dir * overlap;
-                projection_onto_dir := dot(guy.vel, dir) * dir;
-                if dot(guy.vel, dir) >= 0 {
-                    guy.vel -= projection_onto_dir;
+            for * a: rocks {
+                for * b: rocks {
+                    if b == a continue;
+                    disp := b.pos - a.pos;
+                    dist := length(disp);
+                    dir := disp / dist;
+                    if dist == 0 {
+                        dir = .{1, 0};
+                    }
+                    if dist < 1 {
+                        overlap := 1 - dist;
+                        b.pos += dir * overlap / 2;
+                    }
+                }
+            }
+            for * trees {
+                disp := it.pos - guy.pos;
+                dist := length(disp);
+                dir := disp / dist;
+                if dist == 0 {
+                    dir = .{1, 0};
+                }
+                if dist < 0.75 {
+                    overlap := 0.75 - dist;
+                    // it.pos += dir * overlap / 2;
+                    guy.pos -= dir * overlap;
+                    projection_onto_dir := dot(guy.vel, dir) * dir;
+                    if dot(guy.vel, dir) >= 0 {
+                        guy.vel -= projection_onto_dir;
+                    }
+                    // guy.vel = .{};
                 }
             }
         }
