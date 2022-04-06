@@ -458,6 +458,14 @@ main :: () {
         draw_rect :: (image: * Simp.Texture, pos: Vector2, camera: *Camera, theta: float, w: float, h: float) {
             Simp.set_shader_for_images(image);
             draw_rect_core(pos, camera, theta, w, h, .{1, 1, 1, 1});
+            draw_rect_core(pos + v2(-100, 0), camera, theta, w, h, .{1, 1, 1, 1});
+            draw_rect_core(pos + v2(+100, 0), camera, theta, w, h, .{1, 1, 1, 1});
+            draw_rect_core(pos + v2(0, -100), camera, theta, w, h, .{1, 1, 1, 1});
+            draw_rect_core(pos + v2(0, +100), camera, theta, w, h, .{1, 1, 1, 1});
+            draw_rect_core(pos + v2(-100, -100), camera, theta, w, h, .{1, 1, 1, 1});
+            draw_rect_core(pos + v2(-100, +100), camera, theta, w, h, .{1, 1, 1, 1});
+            draw_rect_core(pos + v2(+100, -100), camera, theta, w, h, .{1, 1, 1, 1});
+            draw_rect_core(pos + v2(+100, +100), camera, theta, w, h, .{1, 1, 1, 1});
         }
         draw_rect :: (pos: Vector2, camera: *Camera, theta: float, w: float, h: float, color: Vector4 = .{1, 1, 1, 1}) {
             Simp.set_shader_for_color();
