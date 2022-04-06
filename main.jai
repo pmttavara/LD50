@@ -85,6 +85,7 @@ main :: () {
     }
 
     guypos := v2(0, 0);
+    guyvel := v2(0, 0);
 
     prev := get_time();
 
@@ -119,6 +120,8 @@ main :: () {
         if quit break;
 
         GUY_SPEED :: 4.0;
+        GUY_ACCEL :: 69.0;
+        GUY_TURN_ACCEL :: GUY_ACCEL * 8;
         {
             x := cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "D") >= 0x8000)
                - cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "A") >= 0x8000);
@@ -142,8 +145,20 @@ main :: () {
             }
             input = normalize(input);
 
-            guypos.x += dt * GUY_SPEED * input.x;
-            guypos.y += dt * GUY_SPEED * input.y;
+            accel := GUY_ACCEL;
+            if dot(normalize(input), normalize(guyvel)) < 0.5 {
+                accel = GUY_TURN_ACCEL;
+            }
+            guyvel += dt * accel * input;
+            max_speed := GUY_SPEED;
+            if length(input) <= 0.01 {
+                max_speed = 0;
+            }
+            if length(guyvel) > max_speed {
+                guyvel /= length(guyvel);
+                guyvel *= max_speed;
+            }
+            guypos += guyvel * dt;
         }
 
         mouse_pos := v2(0, 0);
