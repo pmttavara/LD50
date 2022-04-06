@@ -176,10 +176,10 @@ main :: () {
                 }
                 delta_total := accel * dt;
                 delta_this_frame := clamp(GUY_SPEED - dot(guyvel, input), 0, delta_total);
-                guyvel += delta_this_frame * input;
+                accel = delta_this_frame / dt;
             }
                 
-            // guyvel += dt * accel * input;
+            guyvel += dt * accel * input;
 
             // print("% %% of max speed\n", length(guyvel) / GUY_SPEED * 100);
             
