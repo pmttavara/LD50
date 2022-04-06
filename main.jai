@@ -143,7 +143,7 @@ main :: () {
             mouse_pos = v2(cast(float) (mouse_x - window_width / 2) / window_width, cast(float) (window_height / 2 - mouse_y) / window_width) * CAMERA_SCALE;
         }
 
-        GUY_SPEED :: 5.0;
+        GUY_SPEED :: 3.0;
         GUY_ACCEL :: GUY_SPEED * 8;
         GUY_TURN_ACCEL :: GUY_ACCEL * 8;
         {
@@ -174,7 +174,11 @@ main :: () {
                 if swing_timer < 0 {
                     swing_timer = SWING_TIME;
 
-                    guyvel += sword_vector * 2;
+                    if dot(guyvel, sword_vector) < GUY_SPEED * 0.5 {
+                        guyvel += sword_vector * 10;
+                    } else {
+                        guyvel += sword_vector * 3;
+                    }
                 }
             }
 
@@ -209,7 +213,10 @@ main :: () {
             }
             guypos += guyvel * dt;
 
-            sword_vector = normalize(mouse_pos - guypos);
+            // if swing_timer < 0
+            {
+                sword_vector = normalize(mouse_pos - guypos);
+            }
         }
 
         // debug_break();
@@ -229,7 +236,11 @@ main :: () {
         }
         draw_rect(*stickman, guypos, CAMERA_SCALE, 0, 1, 1);
         draw_rect(*cursor, mouse_pos, CAMERA_SCALE, xx fmod(get_time() / 8, 1) * TAU, 1, 1);
-        draw_rect(*sword, guypos + sword_vector * 1.5, CAMERA_SCALE, atan2(sword_vector.y, sword_vector.x), 2, 1);
+        {
+            theta := clamp((swing_timer - SWING_TIME * 0.8) / (SWING_TIME * 0.2), 0, 1) * TAU / 4 - TAU / 8;
+            v := rotate(sword_vector, theta);
+            draw_rect(*sword, guypos + v * 1.5, CAMERA_SCALE, atan2(v.y, v.x), 2, 1);
+        }
 
         Simp.swap_buffers(window);
     }
