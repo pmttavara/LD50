@@ -97,7 +97,8 @@ main :: () {
 
     sword_vector := v2(0, 0);
 
-    swing_timer := 0;
+    swing_timer := 0.0;
+    SWING_TIME :: 1.0;
 
     prev := get_time();
 
@@ -142,7 +143,7 @@ main :: () {
             mouse_pos = v2(cast(float) (mouse_x - window_width / 2) / window_width, cast(float) (window_height / 2 - mouse_y) / window_width) * CAMERA_SCALE;
         }
 
-        GUY_SPEED :: 4.0;
+        GUY_SPEED :: 5.0;
         GUY_ACCEL :: GUY_SPEED * 8;
         GUY_TURN_ACCEL :: GUY_ACCEL * 8;
         {
@@ -168,11 +169,20 @@ main :: () {
             }
             input = normalize(input);
 
+            swing_timer -= dt;
+            if spacebar_pressed {
+                if swing_timer < 0 {
+                    swing_timer = SWING_TIME;
+
+                    guyvel += sword_vector * 2;
+                }
+            }
+
             accel := GUY_ACCEL;
             {
                 if length(guyvel) > GUY_SPEED / 8 && length(input) > 0 && dot(normalize(guyvel), normalize(input)) <= sqrt(0.5) + 0.01 {
                     accel = GUY_TURN_ACCEL;
-                    print("GUY_TURN_ACCEL!!!!!!!\n");
+                    // print("GUY_TURN_ACCEL!!!!!!!\n");
                 }
                 delta_total := accel * dt;
                 delta_this_frame := clamp(GUY_SPEED - dot(guyvel, input), 0, delta_total);
@@ -191,6 +201,11 @@ main :: () {
                 guyvel -= orthogonal_vel;
                 orthogonal_vel *= pow(0.0000001, dt);
                 guyvel += orthogonal_vel;
+
+                // speed := max(GUY_SPEED * 0, length(guyvel));
+                // friction_amt := speed * 4 * dt;
+                // scale := clamp(speed - friction_amt, 0, speed) / speed;
+                // guyvel *= scale;
             }
             guypos += guyvel * dt;
 
