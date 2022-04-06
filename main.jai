@@ -73,6 +73,9 @@ main :: () {
     fullscreen := true;
     Simp.set_render_target(window);
 
+    GL :: #import "GL";
+    GL.wglSwapIntervalEXT(-1);
+
     stickman: Simp.Texture;
     {
         success := Simp.texture_load_from_file(*stickman, "stickman.png");
@@ -94,6 +97,8 @@ main :: () {
 
     sword_vector := v2(0, 0);
 
+    swing_timer := 0;
+
     prev := get_time();
 
     CAMERA_SCALE := 35.0;
@@ -111,6 +116,7 @@ main :: () {
                 window_height = it.height;
             }
         }
+        spacebar_pressed := false;
         for Input.events_this_frame {
             if it.type == .QUIT quit = true;
 
@@ -121,6 +127,9 @@ main :: () {
                 }
                 if it.key_pressed && (it.key_code == .F4 && it.alt_pressed) {
                     quit = true;
+                }
+                if it.key_pressed && it.key_code == #char " " {
+                    spacebar_pressed = true;
                 }
             }
         }
@@ -134,7 +143,7 @@ main :: () {
         }
 
         GUY_SPEED :: 4.0;
-        GUY_ACCEL :: 69.0;
+        GUY_ACCEL :: GUY_SPEED * 8;
         GUY_TURN_ACCEL :: GUY_ACCEL * 8;
         {
             x := cast(float) (cast,trunc(u16) Windows.GetKeyState(#char "D") >= 0x8000)
@@ -160,17 +169,28 @@ main :: () {
             input = normalize(input);
 
             accel := GUY_ACCEL;
-            if dot(normalize(input), normalize(guyvel)) < 0.5 {
-                accel = GUY_TURN_ACCEL;
+            {
+                if length(guyvel) > GUY_SPEED / 8 && length(input) > 0 && dot(normalize(guyvel), normalize(input)) <= sqrt(0.5) + 0.01 {
+                    accel = GUY_TURN_ACCEL;
+                    print("GUY_TURN_ACCEL!!!!!!!\n");
+                }
+                delta_total := accel * dt;
+                delta_this_frame := clamp(GUY_SPEED - dot(guyvel, input), 0, delta_total);
+                guyvel += delta_this_frame * input;
             }
-            guyvel += dt * accel * input;
-            max_speed := GUY_SPEED;
+                
+            // guyvel += dt * accel * input;
+
+            // print("% %% of max speed\n", length(guyvel) / GUY_SPEED * 100);
+            
             if length(input) <= 0.01 {
-                max_speed = 0;
-            }
-            if length(guyvel) > max_speed {
-                guyvel /= length(guyvel);
-                guyvel *= max_speed;
+                guyvel *= pow(0.0000001, dt);
+            } else {
+                input_perp := v2(input.y, -input.x);
+                orthogonal_vel := input_perp * (dot(guyvel, input_perp) / dot(input_perp, input_perp));
+                guyvel -= orthogonal_vel;
+                orthogonal_vel *= pow(0.0000001, dt);
+                guyvel += orthogonal_vel;
             }
             guypos += guyvel * dt;
 
@@ -193,8 +213,8 @@ main :: () {
             Simp.immediate_flush();
         }
         draw_rect(*stickman, guypos, CAMERA_SCALE, 0, 1, 1);
-        draw_rect(*cursor, mouse_pos, CAMERA_SCALE, xx fmod(get_time(), 1) * TAU, 1, 1);
-        draw_rect(*sword, guypos + sword_vector, CAMERA_SCALE, atan2(sword_vector.y, sword_vector.x), 2, 1);
+        draw_rect(*cursor, mouse_pos, CAMERA_SCALE, xx fmod(get_time() / 8, 1) * TAU, 1, 1);
+        draw_rect(*sword, guypos + sword_vector * 1.5, CAMERA_SCALE, atan2(sword_vector.y, sword_vector.x), 2, 1);
 
         Simp.swap_buffers(window);
     }
