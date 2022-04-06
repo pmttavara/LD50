@@ -9,6 +9,7 @@ Simp :: #import "Simp";
 #import "Window_Creation";
 Windows :: #import "Windows";
 Input :: #import "Input";
+#import "Random";
 
 // invfreq :: float64;
 // get_time :: () -> float64 {
@@ -132,9 +133,10 @@ main :: () {
 
     prev := get_time();
 
+    CAMERA_BASE_SCALE :: 35.0;
     Camera :: struct {
         using entity: Entity;
-        scale := 35.0;
+        scale := CAMERA_BASE_SCALE;
     }
     camera: Camera;
 
@@ -157,30 +159,23 @@ main :: () {
         camera = .{};
         rocks.count = 0;
         trees.count = 0;
-        array_add(*rocks, Rock.{ x = 2, y = 2 });
-        array_add(*rocks, Rock.{ x = 3, y = 4 });
-        array_add(*rocks, Rock.{ x = 4, y = 5 });
-        array_add(*rocks, Rock.{ x = 5, y = 1 });
-        array_add(*rocks, Rock.{ x = 9, y = 0 });
-        array_add(*rocks, Rock.{ x = 7, y = 2 });
-        array_add(*rocks, Rock.{ x = 1, y = 3 });
-        array_add(*rocks, Rock.{ x = 8, y = 3 });
-        array_add(*rocks, Rock.{ x = 1, y = 4 });
-        array_add(*rocks, Rock.{ x = 8, y = 5 });
-        array_add(*rocks, Rock.{ x = 8, y = 6 });
-        array_add(*rocks, Rock.{ x = 9, y = 7 });
-        array_add(*trees, Tree.{ x = 12, y = 2 });
-        array_add(*trees, Tree.{ x = 13, y = 2 });
-        array_add(*trees, Tree.{ x = 14, y = 2 });
-        array_add(*trees, Tree.{ x = 15, y = 2 });
-        array_add(*trees, Tree.{ x = 16, y = 2 });
-        array_add(*trees, Tree.{ x = 17, y = 2 });
-        array_add(*trees, Tree.{ x = 18, y = 2 });
-        array_add(*trees, Tree.{ x = 18, y = 3 });
-        array_add(*trees, Tree.{ x = 18, y = 4 });
-        array_add(*trees, Tree.{ x = 18, y = 5 });
-        array_add(*trees, Tree.{ x = 18, y = 6 });
-        array_add(*trees, Tree.{ x = 19, y = 7 });
+        random_seed(123456789);
+        for y: -50..+50 {
+            for x: -50..+50 {
+                r := random_get_zero_to_one();
+                if (r <= 0.01) {
+                    rock : Rock;
+                    rock.x = xx x;
+                    rock.y = xx y;
+                    array_add(*rocks, rock);
+                } else if (r <= 0.02) {
+                    tree : Tree;
+                    tree.x = xx x;
+                    tree.y = xx y;
+                    array_add(*trees, tree);
+                }
+            }
+        }
     }
     reset_game();
 
@@ -246,13 +241,27 @@ main :: () {
             }
         }
 
+        time_scale := 1.0;
+        if cast(float) (cast,trunc(u16) Windows.GetKeyState(Windows.VK_SHIFT) >= 0x8000) {
+            time_scale *= 0.1;
+        }
         while accumulator > 1.0 / 240 {
             accumulator -= 1.0 / 240;
 
-            dt := 1.0 / 240;
+            dt := 1.0 / 240 * time_scale;
             camera.pos -= guy.pos;
             camera.pos *= pow(0.01, dt);
             camera.pos += guy.pos;
+
+            {
+                target_scale := CAMERA_BASE_SCALE;
+                if length(guy.vel) >= 10 {
+                    target_scale *= pow(2.0, (length(guy.vel) - 10) / 50);
+                }
+                camera.scale -= target_scale;
+                camera.scale *= pow(0.1, dt);
+                camera.scale += target_scale;
+            }
 
             GUY_SPEED :: 4.0;
             GUY_ACCEL :: GUY_SPEED * 8;
@@ -356,6 +365,20 @@ main :: () {
                     }
                 }
             }
+            for * rocks {
+                v := get_sword_vector(sword_vector, swing_timer, SWING_TIME);
+
+                disp := it.pos - guy.pos;
+                dist := length(disp);
+                dir := normalize(disp);
+                theta :: TAU / 64;
+                if dist < 3 && dot(dir, v) >= cos(theta) {
+                    if swing_timer > SWING_TIME * 0.75 {
+                        guy.vel += v * 5;
+                        swing_timer = SWING_TIME * 0.75;
+                    }
+                }
+            }
             for * trees {
                 v := get_sword_vector(sword_vector, swing_timer, SWING_TIME);
 
@@ -366,9 +389,9 @@ main :: () {
                 if dist < 3 && dot(dir, v) >= cos(theta) {
                     if swing_timer >= SWING_TIME * 0.75 {
                         it.scheduled_for_deletion = true;
+                        guy.vel += v * 5;
                     }
                 }
-                
             }
             for * trees {
                 disp := it.pos - guy.pos;
@@ -387,6 +410,23 @@ main :: () {
                     }
                     // guy.vel = .{};
                 }
+            }
+
+            if guy.x < -50 {
+                guy.x += 100;
+                camera.x += 100;
+            }
+            if guy.x > +50 {
+                guy.x -= 100;
+                camera.x -= 100;
+            }
+            if guy.y < -50 {
+                guy.y += 100;
+                camera.y += 100;
+            }
+            if guy.y > +50 {
+                guy.y -= 100;
+                camera.y -= 100;
             }
 
             {
@@ -423,9 +463,18 @@ main :: () {
             Simp.set_shader_for_color();
             draw_rect_core(pos, camera, theta, w, h, color);
         }
-        for y: cast(int) (camera.y - camera.scale / 2 * window_height / window_width) .. cast(int) (camera.y + camera.scale / 2 * window_height / window_width) {
-            for x: cast(int) (camera.x - camera.scale / 2) .. cast(int) (camera.x + camera.scale / 2) {
-                draw_rect(v2(cast(float) x, cast(float) y), *camera, 0, 0.1, 0.1, .{0.8, 0.8, 0.8, 0.2});
+        {
+            color := Vector4.{0.8, 0.8, 0.8, 0.2};
+            if camera.scale > 40 {
+                color.w *= 1 - (camera.scale - 40) / 70;
+                Clamp(*color.w, 0, 1);
+            }
+            if color.w {
+                for y: cast(int) (camera.y - camera.scale / 2 * window_height / window_width) .. cast(int) (camera.y + camera.scale / 2 * window_height / window_width) {
+                    for x: cast(int) (camera.x - camera.scale / 2) .. cast(int) (camera.x + camera.scale / 2) {
+                        draw_rect(v2(cast(float) x, cast(float) y), *camera, 0, 0.1, 0.1, color);
+                    }
+                }
             }
         }
 
