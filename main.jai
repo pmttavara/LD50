@@ -412,23 +412,6 @@ main :: () {
                 }
             }
 
-            if guy.x < -50 {
-                guy.x += 100;
-                camera.x += 100;
-            }
-            if guy.x > +50 {
-                guy.x -= 100;
-                camera.x -= 100;
-            }
-            if guy.y < -50 {
-                guy.y += 100;
-                camera.y += 100;
-            }
-            if guy.y > +50 {
-                guy.y -= 100;
-                camera.y -= 100;
-            }
-
             {
                 i := 0;
                 while i < trees.count {
@@ -458,14 +441,6 @@ main :: () {
         draw_rect :: (image: * Simp.Texture, pos: Vector2, camera: *Camera, theta: float, w: float, h: float) {
             Simp.set_shader_for_images(image);
             draw_rect_core(pos, camera, theta, w, h, .{1, 1, 1, 1});
-            draw_rect_core(pos + v2(-100, 0), camera, theta, w, h, .{1, 1, 1, 1});
-            draw_rect_core(pos + v2(+100, 0), camera, theta, w, h, .{1, 1, 1, 1});
-            draw_rect_core(pos + v2(0, -100), camera, theta, w, h, .{1, 1, 1, 1});
-            draw_rect_core(pos + v2(0, +100), camera, theta, w, h, .{1, 1, 1, 1});
-            draw_rect_core(pos + v2(-100, -100), camera, theta, w, h, .{1, 1, 1, 1});
-            draw_rect_core(pos + v2(-100, +100), camera, theta, w, h, .{1, 1, 1, 1});
-            draw_rect_core(pos + v2(+100, -100), camera, theta, w, h, .{1, 1, 1, 1});
-            draw_rect_core(pos + v2(+100, +100), camera, theta, w, h, .{1, 1, 1, 1});
         }
         draw_rect :: (pos: Vector2, camera: *Camera, theta: float, w: float, h: float, color: Vector4 = .{1, 1, 1, 1}) {
             Simp.set_shader_for_color();
