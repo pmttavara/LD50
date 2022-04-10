@@ -87,7 +87,7 @@ main :: () {
     Simp.set_render_target(window);
 
     GL :: #import "GL";
-    GL.wglSwapIntervalEXT(0);
+    GL.wglSwapIntervalEXT(-1);
     
     stickman: Simp.Texture;
     {
@@ -182,6 +182,7 @@ main :: () {
     accumulator := 0.0;
 
     mouse_pos := v2(0, 0);
+    spacebar_pressed := false;
 
     quit := false;
     while !quit {
@@ -211,7 +212,6 @@ main :: () {
             }
         }
 
-        spacebar_pressed := false;
         for Input.events_this_frame {
             if it.type == .QUIT quit = true;
 
@@ -245,13 +245,18 @@ main :: () {
         if cast(float) (cast,trunc(u16) Windows.GetKeyState(Windows.VK_SHIFT) >= 0x8000) {
             time_scale *= 0.1;
         }
-        while accumulator > 1.0 / 240 {
-            accumulator -= 1.0 / 240;
+        TICKRATE :: 120;
+        while accumulator > 1.0 / TICKRATE {
+            accumulator -= 1.0 / TICKRATE;
 
-            dt := 1.0 / 240 * time_scale;
+            dt := 1.0 / TICKRATE * time_scale;
             camera.pos -= guy.pos;
             camera.pos *= pow(0.01, dt);
             camera.pos += guy.pos;
+
+            defer {
+                spacebar_pressed = false;
+            }
 
             {
                 target_scale := CAMERA_BASE_SCALE;
@@ -298,7 +303,7 @@ main :: () {
                 accel := GUY_ACCEL;
                 {
                     if length(guy.vel) > GUY_SPEED / 8 && length(input) > 0 && dot(normalize(guy.vel), normalize(input)) <= cos(TAU / 16) + 0.01 {
-                        // accel = GUY_TURN_ACCEL;
+                        accel = GUY_TURN_ACCEL;
                         // print("GUY_TURN_ACCEL!!!!!!!\n");
                     }
                     delta_total := accel * dt;
@@ -332,7 +337,11 @@ main :: () {
                         sign = -1;
                     }
                     turn_speed := 8.0;
-                    guy.vel = rotate(guy.vel, turn_speed * sign * dt);
+                    rotate_this_frame := turn_speed * sign * dt;
+                    if abs(rotate_this_frame) > abs(theta) {
+                        rotate_this_frame = theta;
+                    }
+                    guy.vel = rotate(guy.vel, rotate_this_frame);
                 } else {
                     input_perp := v2(input.y, -input.x);
                     orthogonal_vel := input_perp * (dot(guy.vel, input_perp) / dot(input_perp, input_perp));
@@ -344,6 +353,14 @@ main :: () {
                     // friction_amt := speed * 4 * dt;
                     // scale := clamp(speed - friction_amt, 0, speed) / speed;
                     // guy.vel *= scale;
+                }
+                { // Apply unconditional friction for all speeds over GUY_SPEED * 3.
+                    dir := normalize(guy.vel);
+                    if length(guy.vel) > GUY_SPEED * 3 {
+                        guy.vel -= dir * GUY_SPEED * 3;
+                        guy.vel *= pow(0.001, dt);
+                        guy.vel += dir * GUY_SPEED * 3;
+                    }
                 }
                 guy.pos += guy.vel * dt;
 
@@ -392,11 +409,16 @@ main :: () {
                 disp := it.pos - guy.pos;
                 dist := length(disp);
                 dir := normalize(disp);
-                theta :: TAU / 64;
+                theta := get_sword_vector_angle_derivative(swing_timer, SWING_TIME) * dt;
                 if dist < 3 && dot(dir, v) >= cos(theta) {
                     if swing_timer > SWING_TIME * 0.75 {
                         swing_timer = SWING_TIME * 0.75;
-                        delta_this_frame := clamp(GUY_SPEED * 3 - length(guy.vel), 0, 5);
+                        delta_this_frame := 0.0;
+                        if length(guy.vel) > GUY_SPEED * 2 {
+                            delta_this_frame = clamp(GUY_SPEED * 4 - length(guy.vel), 0, GUY_SPEED);
+                        } else {
+                            delta_this_frame = clamp(GUY_SPEED * 2.5 - length(guy.vel), 0, GUY_SPEED);
+                        }
                         guy.vel += v * delta_this_frame;
                     }
                 }
@@ -407,11 +429,16 @@ main :: () {
                 disp := it.pos - guy.pos;
                 dist := length(disp);
                 dir := normalize(disp);
-                theta :: TAU / 64;
+                theta := get_sword_vector_angle_derivative(swing_timer, SWING_TIME) * dt;
                 if dist < 3 && dot(dir, v) >= cos(theta) {
                     if swing_timer >= SWING_TIME * 0.75 {
                         it.scheduled_for_deletion = true;
-                        delta_this_frame := clamp(GUY_SPEED * 3 - length(guy.vel), 0, 5);
+                        delta_this_frame := 0.0;
+                        if length(guy.vel) > GUY_SPEED * 2 {
+                            delta_this_frame = clamp(GUY_SPEED * 4 - length(guy.vel), 0, GUY_SPEED);
+                        } else {
+                            delta_this_frame = clamp(GUY_SPEED * 2.5 - length(guy.vel), 0, GUY_SPEED);
+                        }
                         guy.vel += v * delta_this_frame;
                     }
                 }
@@ -505,6 +532,15 @@ main :: () {
             theta := x * TAU / 4 - TAU / 8;
             v := rotate(base_sword_vector, theta);
             return v;
+        }
+        get_sword_vector_angle_derivative :: (swing_timer: float, $SWING_TIME: float) -> float {
+            x := swing_timer / SWING_TIME;
+            K := 0.75;
+            if x < K {
+                return 1 / SWING_TIME / K;
+            } else {
+                return -TAU / 4 * (1 / SWING_TIME) / (1 - K);
+            }
         }
         {
             v := get_sword_vector(sword_vector, swing_timer, SWING_TIME);
