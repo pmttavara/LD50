@@ -290,7 +290,7 @@ main :: () {
                         //     guy.vel += sword_vector * 1;
                         // }
                         impulse := 10.0;
-                        delta_this_frame := clamp(GUY_SPEED * 2 - dot(guy.vel, sword_vector), 0, impulse);
+                        delta_this_frame := clamp(GUY_SPEED * 2 - length(guy.vel), 0, impulse);
                         guy.vel += sword_vector * delta_this_frame;
                     }
                 }
@@ -298,20 +298,41 @@ main :: () {
                 accel := GUY_ACCEL;
                 {
                     if length(guy.vel) > GUY_SPEED / 8 && length(input) > 0 && dot(normalize(guy.vel), normalize(input)) <= cos(TAU / 16) + 0.01 {
-                        accel = GUY_TURN_ACCEL;
+                        // accel = GUY_TURN_ACCEL;
                         // print("GUY_TURN_ACCEL!!!!!!!\n");
                     }
                     delta_total := accel * dt;
-                    delta_this_frame := clamp(GUY_SPEED - dot(guy.vel, input), 0, delta_total);
+                    delta_this_frame := 0.0;
+                    if length(guy.vel) > GUY_SPEED * 2 {
+                        delta_this_frame = clamp(GUY_SPEED - length(guy.vel), 0, delta_total);
+                    } else {
+                        delta_this_frame = clamp(GUY_SPEED - dot(guy.vel, input), 0, delta_total);
+                    }
                     accel = delta_this_frame / dt;
                 }
-                    
+
                 guy.vel += dt * accel * input;
 
-                // print("% %% of max speed\n", length(guy.vel) / GUY_SPEED * 100);
+                print("% %% of max speed\r", formatFloat(length(guy.vel) / GUY_SPEED * 100, width=3));
                 
                 if length(input) <= 0.01 {
                     guy.vel *= pow(0.0000001, dt);
+                } else if length(guy.vel) > GUY_SPEED * 2 {
+                    target := input;
+                    current := guy.vel;
+                    phi := atan2(current.y, current.x);
+                    target_rotated := rotate(target, -phi);
+                    theta := atan2(target_rotated.y, target_rotated.x);
+                    
+                    sign := 0.0;
+                    if theta > 0 {
+                        sign = 1;
+                    }
+                    if theta < 0 {
+                        sign = -1;
+                    }
+                    turn_speed := 8.0;
+                    guy.vel = rotate(guy.vel, turn_speed * sign * dt);
                 } else {
                     input_perp := v2(input.y, -input.x);
                     orthogonal_vel := input_perp * (dot(guy.vel, input_perp) / dot(input_perp, input_perp));
@@ -374,8 +395,9 @@ main :: () {
                 theta :: TAU / 64;
                 if dist < 3 && dot(dir, v) >= cos(theta) {
                     if swing_timer > SWING_TIME * 0.75 {
-                        guy.vel += v * 5;
                         swing_timer = SWING_TIME * 0.75;
+                        delta_this_frame := clamp(GUY_SPEED * 3 - length(guy.vel), 0, 5);
+                        guy.vel += v * delta_this_frame;
                     }
                 }
             }
@@ -389,7 +411,8 @@ main :: () {
                 if dist < 3 && dot(dir, v) >= cos(theta) {
                     if swing_timer >= SWING_TIME * 0.75 {
                         it.scheduled_for_deletion = true;
-                        guy.vel += v * 5;
+                        delta_this_frame := clamp(GUY_SPEED * 3 - length(guy.vel), 0, 5);
+                        guy.vel += v * delta_this_frame;
                     }
                 }
             }
@@ -425,7 +448,7 @@ main :: () {
         }
 
         // debug_break();
-        Simp.clear_render_target(0, 0, 0, 1);
+        Simp.clear_render_target(9/255.0, 73/255.0, 23/255.0, 1);
         draw_rect_core :: (pos: Vector2, camera: *Camera, theta: float, w: float, h: float, color: Vector4) {
             GL.glEnable(GL.GL_BLEND);
             GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
